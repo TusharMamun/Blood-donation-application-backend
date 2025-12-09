@@ -27,6 +27,7 @@ async function run() {
 const db = client.db("Blood_Donation_Application_DB")
 // All colleciton of mongodb
 const allRegisteredDonorInfoCollection = db.collection("allRegisteredDonorInfo")
+const AllblodDonationRequest = db.collection("BlodeDonationRequest")
 
 // allRegisteredDonorInfo Api
 app.post('/regesterDoner',async(req,res)=>{
@@ -34,6 +35,122 @@ const userInfo = req.body;
 const result = await allRegisteredDonorInfoCollection.insertOne(userInfo)
 res.send(result)
 })
+
+
+// Creat  request Data
+app.post('/CreatedBloadDonation',async(req,res)=>{
+const RequestedInfo = req.body;
+const result = await AllblodDonationRequest.insertOne(RequestedInfo)
+res.send(result)   
+})
+app.get('/all-dontionrequest',async(req,res)=>{
+
+})
+
+
+
+// get All request data  FOR PENDIN REQUEST
+app.get("/donation-requests", async (req, res) => {
+  try {
+    const { status } = req.query;
+
+    const query = {};
+    if (status) query.status = status; // pending/approved/done/cancelled
+
+    const result = await AllblodDonationRequest
+      .find(query)
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ message: "Server error", error: error.message });
+  }
+});
+
+app.get("/blood-donation-requests", async (req, res) => {
+  try {
+    const { status, bloodGroup, search, page = 1, limit = 10 } = req.query;
+
+    const query = {};
+    if (status) query.status = status;
+    if (bloodGroup) query.bloodGroup = bloodGroup;
+
+    if (search) {
+      query.$or = [
+        { patientName: { $regex: search, $options: "i" } },
+        { hospitalName: { $regex: search, $options: "i" } },
+        { location: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+        { phone: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const pageNum = Number(page);
+    const limitNum = Number(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const [result, total] = await Promise.all([
+      AllblodDonationRequest.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .toArray(),
+      AllblodDonationRequest.countDocuments(query),
+    ]);
+
+    res.send({
+      result,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+    });
+  } catch (error) {
+    res.status(500).send({ message: "Server error", error: error.message });
+  }
+});
+
+
+
+
+
+
+
+
+// my requests 
+app.get("/my-blood-donation-requests", async (req, res) => {
+  try {
+    const { email } = req.query;
+
+    if (!email) {
+      return res.status(400).send({ message: "email is required" });
+    }
+
+    const result = await AllblodDonationRequest
+      .find({ 
+requesterEmail:email })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ message: "Server error", error: error.message });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
 // get all  user
 app.get("/regesterDoner", async (req, res) => {
   try {
