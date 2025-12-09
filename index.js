@@ -2,7 +2,7 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 5000;
 const app = express();
 
@@ -35,6 +35,13 @@ const userInfo = req.body;
 const result = await allRegisteredDonorInfoCollection.insertOne(userInfo)
 res.send(result)
 })
+// Payment intregratin in script 
+
+
+
+
+
+
 
 
 // Creat  request Data
@@ -111,7 +118,12 @@ app.get("/blood-donation-requests", async (req, res) => {
   }
 });
 
+// Get Donattion details page
+app.get("/blood-donation-requests/:id", async (req, res) => {
 
+  const result = await AllblodDonationRequest.findOne({ _id: new ObjectId(req.params.id) });
+  res.send(result);
+});
 
 
 
