@@ -192,10 +192,23 @@ app.get("/blood-donation-requests", async (req, res) => {
 });
 
 // Get Donattion details page
-app.get("/blood-donation-requests/:id", async (req, res) => {
+const { ObjectId } = require("mongodb");
 
-  const result = await AllblodDonationRequest.findOne({ _id: new ObjectId(req.params.id) });
-  res.send(result);
+app.get("/blood-donation-requests-details/:id", async (req, res) => {
+  try {
+    const result = await AllblodDonationRequest.findOne({
+      _id: new ObjectId(req.params.id), // ✅ Correct param name
+    });
+
+    if (!result) {
+      return res.status(404).send({ message: "Request not found" });
+    }
+
+    res.send(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: "Server error" });
+  }
 });
 
 
@@ -504,9 +517,182 @@ app.patch("/users/:id/role", async (req, res) => {
     res.status(500).send({ message: "Server error", error: error.message });
   }
 });
+app.patch("/users/:id/status", async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
 
+  try {
+    const allowedStatuses = ["active", "blocked"];
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ message: "Invalid status value" });
+    }
 
+    const filter = { _id: new ObjectId(id) };
+    const updateDoc = {
+      $set: { status },
+    };
 
+    const result = await allRegisteredDonorInfoCollection.updateOne(
+      filter,
+      updateDoc
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Optional: return the updated document
+    const updatedUser = await allRegisteredDonorInfoCollection.findOne(filter);
+
+    return res.json({
+      message: "User status updated successfully",
+      user: updatedUser,
+    });
+  } catch (err) {
+    console.error("Error updating user status:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+app.patch("/blood-donation-requests/:id/status", async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  try {
+    const allowedStatuses = ["done", "cancelled"]; 
+
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ message: "Invalid status value" });
+    }
+
+    const filter = { _id: new ObjectId(id) };
+    const updateDoc = { $set: { status, updatedAt: new Date() } };
+
+    const result = await AllblodDonationRequest.updateOne(
+      filter,
+      updateDoc
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+
+    const updatedRequest = await AllblodDonationRequest.findOne(filter);
+
+    return res.json({
+      message: "Blood donation request status updated successfully",
+      request: updatedRequest,
+    });
+  } catch (err) {
+    console.error("Error updating blood donation request status:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+app.patch("/blood-donation-requests-updateData/:id", async (req, res) => {
+  const { id } = req.params;
+
+  const {
+    requesterName,
+    requesterEmail,
+    recipientName,
+    recipientDistrict,
+    recipientUpazila,
+    hospitalName,
+    fullAddress,
+    bloodGroup,
+    donationDate,
+    donationTime,
+    requestMessage,
+    // status  // 👈 not needed if your form doesn't send it
+  } = req.body;
+
+  try {
+    // Basic validation (optional but good)
+    if (
+      !requesterName ||
+      !requesterEmail ||
+      !recipientName ||
+      !recipientDistrict ||
+      !recipientUpazila ||
+      !hospitalName ||
+      !fullAddress ||
+      !bloodGroup ||
+      !donationDate ||
+      !donationTime ||
+      !requestMessage
+    ) {
+      return res
+        .status(400)
+        .json({ message: "All required fields must be provided" });
+    }
+
+    const filter = { _id: new ObjectId(id) };
+
+    const updateDoc = {
+      $set: {
+        requesterName,
+        requesterEmail,
+        recipientName,
+        recipientDistrict,  // 👈 district name (you mapped from id in frontend)
+        recipientUpazila,
+        hospitalName,
+        fullAddress,
+        bloodGroup,
+        donationDate,       // string date (e.g. "2025-12-10")
+        donationTime,       // string time (e.g. "14:30")
+        requestMessage,
+        updatedAt: new Date(),
+        // ❌ no status here -> existing status in DB stays same
+      },
+    };
+
+    const result = await AllblodDonationRequest.updateOne(
+      filter,
+      updateDoc
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+
+    const updatedRequest = await AllblodDonationRequest.findOne(
+      filter
+    );
+
+    return res.json({
+      message: "Blood donation request updated successfully",
+      request: updatedRequest,
+    });
+  } catch (err) {
+    console.error("Error updating blood donation request:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+app.patch('/my-blood-donation-requests-to-processing/:id', async (req, res) => {
+  const id = req.params.id;
+
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).json({ message: 'Invalid request ID' });
+  }
+
+  try {
+
+    const result = await AllblodDonationRequest
+      .updateOne(
+        { _id: new ObjectId(id), status: 'inprogress' }, // only update if status is 'inprogress'
+        { $set: { status: 'pending', updatedAt: new Date() } }
+      );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: 'Request not found or not in progress' });
+    }
+
+    res.status(200).json({ message: 'Status updated to pending' });
+  } catch (error) {
+    console.error('Error updating request status:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
 
 
 
